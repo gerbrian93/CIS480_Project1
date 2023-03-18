@@ -22,11 +22,14 @@ int main()
    {
       // printf(line);
       //   We'll need the first loop to parse the line and convert to machine code
-      token = strtok(buffer, " ,");
+      token = strtok(buffer, " ,\n");
       while (token != NULL)
       {
-         printf("%s\n", token);
-         token = strtok(NULL, " ,");
+         if (token == NULL || token[0] == '#')
+         {
+            printf("%s\n", token);
+         }
+         token = strtok(NULL, " ,\n");
       }
       // write to out file.
    }
