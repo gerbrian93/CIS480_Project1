@@ -35,7 +35,7 @@ int main()
    }
    fseek(outfp, 0x200, SEEK_SET);
    value = 1;
-   // fwrite(&value, sizeof(int), 1, outfp);
+   fwrite(&value, sizeof(int), 1, outfp);
    fclose(fp);
    fclose(outfp);
    return 0;
