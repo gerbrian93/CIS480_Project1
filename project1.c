@@ -3,30 +3,32 @@
 #include <stdlib.h>
 #include <winsock2.h>
 
-void Rtype(char opcode, char rs, char rt, char rd, char shamt, char funct)
+unsigned int Rtype(char opcode, char rs, char rt, char rd, char shamt, char funct)
 {
-   int r_type = 0;
-   r_type |= (atoi(rs) << 21);
-   r_type |= (atoi(rt) << 16);
-   r_type |= (atoi(rd) << 11);
-   r_type |= (atoi(shamt) << 6);
-   r_type |= atoi(funct);
-   return htonl(r_type);
-
-   printf("rtype\n");
+   unsigned int r_type = (opcode << 26);
+   r_type |= (rs << 21);
+   r_type |= (rt << 16);
+   r_type |= (rd << 11);
+   r_type |= (shamt << 6);
+   r_type |= funct;
+   return r_type;
 }
 
-void Itype()
+unsigned int Itype(char opcode, char rs, char rt, char imm)
 {
-   printf("itype\n");
+   unsigned int i_type = opcode << 26;
+   i_type |= (rs << 21);
+   i_type |= (rt << 16);
+   i_type |= (imm & 0xFFFF);
+   return i_type;
 }
 
 int main()
 {
    FILE *fp, *outfp;
-   char buffer[50];
-   char *opcode, *rs, *rt, *rd, *shamt, *funct;
-
+   char buffer[50], flag = 0;
+   char opcode, rs, rt, rd, shamt, funct;
+   short imm;
    fp = fopen("students.asm", "r");
    outfp = fopen("students2.out", "wb");
 
@@ -52,8 +54,8 @@ int main()
       {
          token = strtok(NULL, " ,\t"); // goes to next token of line
          // printf("%s\n", token);
-         output = atoi(token); // convert the value into 32 bit ingteger
-         output = htonl(output);
+         output = atoi(token);   // convert the value into 32 bit ingteger
+         output = htonl(output); // reverse binary string
          fwrite(&output, sizeof(int), 1, outfp);
       }
       else if (strcmp(token, ".dbyte") == 0)
@@ -70,34 +72,110 @@ int main()
       }
       else if (strcmp(token, ".text") == 0)
       {
-         fseek(outfp, 0x200, SEEK_SET);
+         printf("reading text segment");
       }
       else
       {
          if (strcmp(token, "add") == 0 || strcmp(token, "sll") == 0 || strcmp(token, "slt") == 0 || strcmp(token, "addu") == 0)
          {
+
+            opcode = 0;
             if (strcmp(token, "add") == 0)
             {
+               funct = 0x20;
+               token = strtok(NULL, " ,$\n");
+               rd = atoi(token);
+               token = strtok(NULL, " ,$\n");
+               rs = atoi(token);
+               token = strtok(NULL, " ,$\n");
+               rt = atoi(token);
+               output = Rtype(opcode, rs, rt, rd, shamt, funct);
+               output = htonl(output);
+               fwrite(&output, sizeof(int), 1, outfp);
             }
             else if (strcmp(token, "sll") == 0)
             {
+               funct = 0x00;
+               token = strtok(NULL, " ,$\n");
+               rd = atoi(token);
+               token = strtok(NULL, " ,$\n");
+               rt = atoi(token);
+               token = strtok(NULL, " ,$\n");
+               shamt = atoi(token);
+               rs = 0;
+               output = Rtype(opcode, rs, rt, rd, shamt, funct);
+               output = htonl(output);
+               fwrite(&output, sizeof(int), 1, outfp);
             }
             else if (strcmp(token, "slt") == 0)
             {
+               funct = 0x2A;
+               token = strtok(NULL, " ,$\n");
+               rd = atoi(token);
+               token = strtok(NULL, " ,$\n");
+               rs = atoi(token);
+               token = strtok(NULL, " ,$\n");
+               rt = atoi(token);
+               shamt = 0;
+               output = Rtype(opcode, rs, rt, rd, shamt, funct);
+               output = htonl(output);
+               fwrite(&output, sizeof(int), 1, outfp);
             }
-            else if (strcmp(token, "addu"))
+
+            else if (strcmp(token, "addu") == 0)
             {
+               funct = 0x21;
+               token = strtok(NULL, " ,$\n");
+               rd = atoi(token);
+               token = strtok(NULL, " ,$\n");
+               rs = atoi(token);
+               token = strtok(NULL, " ,$\n");
+               rt = atoi(token);
+               shamt = 0;
+               output = Rtype(opcode, rs, rt, rd, shamt, funct);
+               output = htonl(output);
+               fwrite(&output, sizeof(int), 1, outfp);
             }
-            Rtype(opcode, rs, rt, rd, shamt, funct);
-            printf("%d", output);
          }
          else if (strcmp(token, "addi") == 0 || strcmp(token, "lui") == 0)
          {
-            Itype();
+            if (flag < 1)
+            {
+               fseek(outfp, 0x200, SEEK_SET);
+               flag++;
+            }
+
+            if (strcmp(token, "addi") == 0)
+            {
+               opcode = 0x08;
+               token = strtok(NULL, " ,$");
+               rt = atoi(token);
+               token = strtok(NULL, " ,$");
+               rs = atoi(token);
+               token = strtok(NULL, " ,$");
+               imm = atoi(token);
+               output = Itype(opcode, rs, rt, imm);
+               output = htonl(output);
+               fwrite(&output, sizeof(int), 1, outfp);
+            }
+            else if (strcmp(token, "lui") == 0)
+            {
+               opcode = 0xF;
+               token = strtok(NULL, " ,$");
+               rt = atoi(token);
+               token = strtok(NULL, " ,$");
+               imm = atoi(token);
+               rs = 0;
+               output = Itype(opcode, rs, rt, imm);
+               output = htonl(output);
+               fwrite(&output, sizeof(int), 1, outfp);
+            }
          }
       }
    }
-   // content = fread(buffer, sizeof(char), 200, fp);
+   output = 0;
+   fseek(outfp, 0x3FC, SEEK_SET);
+   fwrite(&output, sizeof(int), 1, outfp);
    fclose(fp);
    fclose(outfp);
 }
